@@ -6,7 +6,8 @@ import { useStore } from '@/store/useStore';
 
 const navItems = [
   { href: '/', label: 'Today', icon: 'home' },
-  { href: '/gym', label: 'Gym', icon: 'dumbbell', active: true },
+  { href: '/tasks', label: 'Tasks', icon: 'tasks' },
+  { href: '/gym', label: 'Gym', icon: 'dumbbell' },
   { href: '/habits', label: 'Habits', icon: 'check', soon: true },
   { href: '/goals', label: 'Goals', icon: 'target', soon: true },
   { href: '/finance', label: 'Finance', icon: 'wallet', soon: true },
@@ -75,6 +76,8 @@ function Icon({ name }: { name: string }) {
   switch (name) {
     case 'home':
       return <svg {...props} viewBox="0 0 24 24"><path d="M3 12L12 4l9 8M5 10v10h14V10" /></svg>;
+    case 'tasks':
+      return <svg {...props} viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12l2 2 4-4" /></svg>;
     case 'dumbbell':
       return <svg {...props} viewBox="0 0 24 24"><path d="M6 5v14M3 8v8M9 4v16M15 4v16M18 5v14M21 8v8M9 12h6" /></svg>;
     case 'check':

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Fraunces, Geist, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { DataProvider } from '@/components/DataProvider';
 
 const display = Fraunces({
   subsets: ['latin'],
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${display.variable} ${sans.variable} ${mono.variable}`}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <DataProvider>{children}</DataProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

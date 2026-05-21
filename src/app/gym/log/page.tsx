@@ -7,6 +7,8 @@ import { Sidebar } from '@/components/Sidebar';
 import { days } from '@/data/days';
 import { exercises } from '@/data/exercises';
 import { useStore, ExerciseLog, SessionLog, useLastEntry } from '@/store/useStore';
+import { createClient } from '@/lib/supabase';
+import { sessionToDb } from '@/components/DataProvider';
 
 function LogPageInner() {
   const params = useSearchParams();
@@ -17,6 +19,7 @@ function LogPageInner() {
   const currentCycle = useStore((s) => s.gym.currentCycle);
   const sessions = useStore((s) => s.gym.sessions);
   const saveSession = useStore((s) => s.gym.saveSession);
+  const userId = useStore((s) => s.userId);
 
   // Find existing session for this cycle+day if any
   const existingSession = sessions.find(
@@ -92,6 +95,13 @@ function LogPageInner() {
       feeling,
     };
     saveSession(session);
+
+    if (userId) {
+      const supabase = createClient();
+      const row = sessionToDb(session, userId);
+      supabase.from('gym_sessions').upsert(row);
+    }
+
     router.push('/gym?saved=1');
   }
 

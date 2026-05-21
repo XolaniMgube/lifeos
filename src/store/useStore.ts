@@ -3,11 +3,39 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+// === Tasks slice types ===
+export type TaskPriority = 'high' | 'medium' | 'low';
+export type TaskStatus = 'open' | 'done' | 'cancelled';
+export type TaskArea = 'health' | 'finance' | 'growth' | 'work' | 'personal';
+
+export type Task = {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  dueDate?: string;      // 'YYYY-MM-DD' local date
+  completedAt?: string;  // ISO datetime
+  createdAt: string;     // ISO datetime
+  notes?: string;
+  area?: TaskArea;
+  goalId?: string;       // stub for Goals module
+};
+
+export type TasksSlice = {
+  tasks: Task[];
+  // Called from DataProvider on mount — replaces entire list
+  hydrate: (tasks: Task[]) => void;
+  // Accept a full pre-built Task so callers can also insert the same object to Supabase
+  addTask: (task: Task) => void;
+  updateTask: (id: string, patch: Partial<Task>) => void;
+  deleteTask: (id: string) => void;
+};
+
 // === Gym slice types ===
 export type SetEntry = {
-  weight?: number; // kg, undefined for bodyweight
+  weight?: number;
   reps?: number;
-  duration?: number; // seconds, for time-based
+  duration?: number;
 };
 
 export type ExerciseLog = {
@@ -17,10 +45,10 @@ export type ExerciseLog = {
 };
 
 export type SessionLog = {
-  id: string; // unique per session
+  id: string;
   cycleNumber: number;
-  dayNumber: number; // 1-4
-  date: string; // ISO
+  dayNumber: number;
+  date: string;
   exercises: ExerciseLog[];
   durationMinutes?: number;
   feeling?: 'great' | 'good' | 'tough' | 'rough';
@@ -29,6 +57,8 @@ export type SessionLog = {
 export type GymSlice = {
   sessions: SessionLog[];
   currentCycle: number;
+  // Called from DataProvider on mount
+  hydrate: (sessions: SessionLog[]) => void;
   saveSession: (session: SessionLog) => void;
   deleteSession: (id: string) => void;
 };
@@ -37,62 +67,92 @@ export type GymSlice = {
 type AppState = {
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  userId: string | null;
+  setUserId: (id: string | null) => void;
   // Modules
   gym: GymSlice;
+  tasks: TasksSlice;
 };
 
+function computeCurrentCycle(sessions: SessionLog[]): number {
+  if (sessions.length === 0) return 1;
+  const maxCycle = Math.max(...sessions.map((s) => s.cycleNumber));
+  for (let cycle = maxCycle; cycle >= 1; cycle--) {
+    const days = new Set(sessions.filter((s) => s.cycleNumber === cycle).map((s) => s.dayNumber));
+    if (days.size < 4) return cycle;
+  }
+  return maxCycle + 1;
+}
+
+// Theme is the only thing persisted to localStorage — all data comes from Supabase
 export const useStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       theme: 'dark',
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+      userId: null,
+      setUserId: (id) => set({ userId: id }),
+
       gym: {
         sessions: [],
         currentCycle: 1,
+        hydrate: (sessions) =>
+          set((s) => ({
+            gym: { ...s.gym, sessions, currentCycle: computeCurrentCycle(sessions) },
+          })),
         saveSession: (session) =>
           set((s) => {
-            // If session id exists, replace it; otherwise append
             const existing = s.gym.sessions.findIndex((x) => x.id === session.id);
             const sessions = [...s.gym.sessions];
             if (existing >= 0) sessions[existing] = session;
             else sessions.push(session);
-
-            // Determine if we should advance the cycle
-            const cycleSessions = sessions.filter((x) => x.cycleNumber === s.gym.currentCycle);
-            const dayNumbers = new Set(cycleSessions.map((x) => x.dayNumber));
-            const cycleComplete = dayNumbers.size === 4;
-            const nextCycle = cycleComplete ? s.gym.currentCycle + 1 : s.gym.currentCycle;
-
             return {
-              gym: { ...s.gym, sessions, currentCycle: nextCycle },
+              gym: { ...s.gym, sessions, currentCycle: computeCurrentCycle(sessions) },
             };
           }),
         deleteSession: (id) =>
+          set((s) => {
+            const sessions = s.gym.sessions.filter((x) => x.id !== id);
+            return {
+              gym: { ...s.gym, sessions, currentCycle: computeCurrentCycle(sessions) },
+            };
+          }),
+      },
+
+      tasks: {
+        tasks: [],
+        hydrate: (tasks) => set((s) => ({ tasks: { ...s.tasks, tasks } })),
+        addTask: (task) =>
+          set((s) => ({ tasks: { ...s.tasks, tasks: [...s.tasks.tasks, task] } })),
+        updateTask: (id, patch) =>
           set((s) => ({
-            gym: { ...s.gym, sessions: s.gym.sessions.filter((x) => x.id !== id) },
+            tasks: {
+              ...s.tasks,
+              tasks: s.tasks.tasks.map((t) => {
+                if (t.id !== id) return t;
+                const completedAt =
+                  patch.status === 'done' && !t.completedAt
+                    ? new Date().toISOString()
+                    : t.completedAt;
+                return { ...t, ...patch, completedAt };
+              }),
+            },
+          })),
+        deleteTask: (id) =>
+          set((s) => ({
+            tasks: { ...s.tasks, tasks: s.tasks.tasks.filter((t) => t.id !== id) },
           })),
       },
     }),
     {
-      name: 'lifeos-storage',
+      name: 'lifeos-theme',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
-        theme: state.theme,
-        gym: { sessions: state.gym.sessions, currentCycle: state.gym.currentCycle },
+      // Only persist theme — all module data comes from Supabase
+      partialize: (state) => ({ theme: state.theme }),
+      merge: (persisted: any, current) => ({
+        ...current,
+        theme: persisted?.theme ?? current.theme,
       }),
-      // Merge persisted state without losing function references
-      merge: (persisted: any, current) => {
-        if (!persisted) return current;
-        return {
-          ...current,
-          theme: persisted.theme ?? current.theme,
-          gym: {
-            ...current.gym,
-            sessions: persisted.gym?.sessions ?? [],
-            currentCycle: persisted.gym?.currentCycle ?? 1,
-          },
-        };
-      },
     }
   )
 );
@@ -104,9 +164,8 @@ export const useGymStats = () => {
 
   const totalSessions = sessions.length;
   const currentCycleSessions = sessions.filter((s) => s.cycleNumber === currentCycle);
-  const cycleProgress = currentCycleSessions.length; // 0-4
+  const cycleProgress = currentCycleSessions.length;
 
-  // Streak: count back from today, consecutive sessions in last N days
   const sortedDates = [...sessions]
     .map((s) => new Date(s.date).toDateString())
     .filter((v, i, a) => a.indexOf(v) === i)
@@ -121,16 +180,10 @@ export const useGymStats = () => {
       const d = new Date(dStr);
       if (!lastDate) {
         const diff = Math.round((cursor.getTime() - d.getTime()) / 86400000);
-        if (diff <= 2) {
-          streak++;
-          lastDate = d;
-        } else break;
+        if (diff <= 2) { streak++; lastDate = d; } else break;
       } else {
         const diff = Math.round((lastDate.getTime() - d.getTime()) / 86400000);
-        if (diff <= 3) {
-          streak++;
-          lastDate = d;
-        } else break;
+        if (diff <= 3) { streak++; lastDate = d; } else break;
       }
     }
   }
@@ -138,7 +191,6 @@ export const useGymStats = () => {
   return { totalSessions, cycleProgress, streak, currentCycle };
 };
 
-// Last entry for an exercise, for showing "last time" stats
 export const useLastEntry = (exerciseId: string): ExerciseLog | null => {
   const sessions = useStore((s) => s.gym.sessions);
   for (let i = sessions.length - 1; i >= 0; i--) {
