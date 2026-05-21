@@ -22,11 +22,11 @@ export default function GymPage() {
     <div className="flex min-h-screen bg-bg-base">
       <Sidebar />
 
-      <main className="flex-1 max-w-5xl mx-auto px-8 py-10">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 pb-28 md:pb-10">
         {/* Header */}
         <div className="mb-10">
           <p className="text-xs uppercase tracking-widest text-ink-tertiary mb-2">Module · Gym</p>
-          <h1 className="display-font text-5xl font-medium text-ink-primary tracking-tightest mb-3">The Cycle</h1>
+          <h1 className="display-font text-4xl sm:text-5xl font-medium text-ink-primary tracking-tightest mb-3">The Cycle</h1>
           <p className="text-ink-secondary max-w-xl">
             Four training days, two rest days. Push, pull, legs, lift — repeat. No muscle worked twice in a cycle. Built for longevity.
           </p>
@@ -34,14 +34,14 @@ export default function GymPage() {
 
         {/* Cycle rhythm */}
         <section className="mb-10">
-          <div className="flex items-baseline justify-between mb-4">
+          <div className="flex items-baseline justify-between gap-4 mb-4">
             <h2 className="display-font text-xl text-ink-primary">Cycle {stats.currentCycle} rhythm</h2>
             <Link href="/gym/history" className="text-xs uppercase tracking-widest text-ink-tertiary hover:text-accent transition-colors">
               History →
             </Link>
           </div>
 
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[
               { type: 'day', day: 1 },
               { type: 'day', day: 2 },
@@ -95,16 +95,16 @@ export default function GymPage() {
                 >
                   <div className="flex items-stretch">
                     <div className={`w-1 bg-muscle-${day.groups[0].muscleHue}`} />
-                    <div className="flex-1 p-5">
-                      <div className="flex items-baseline justify-between mb-3">
+                    <div className="flex-1 p-4 sm:p-5 min-w-0">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between mb-3">
                         <div>
                           <p className="text-xs uppercase tracking-widest text-ink-tertiary mb-1">Day {day.id}</p>
-                          <h3 className="display-font text-2xl text-ink-primary">{day.name} <span className="text-ink-tertiary">— {day.subtitle}</span></h3>
+                          <h3 className="display-font text-xl sm:text-2xl text-ink-primary">{day.name} <span className="text-ink-tertiary">— {day.subtitle}</span></h3>
                         </div>
                         <span className="text-xs text-ink-tertiary mono-font">{totalSets} sets</span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-1 mb-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 mb-4">
                         {day.groups.map((group) => (
                           <div key={group.label}>
                             <p className="text-[11px] uppercase tracking-widest text-ink-tertiary mt-2 mb-1.5">
@@ -131,16 +131,16 @@ export default function GymPage() {
                         ))}
                       </div>
 
-                      <div className="flex gap-2 pt-3 border-t border-line">
+                      <div className="flex flex-wrap gap-2 pt-3 border-t border-line">
                         <Link
                           href={`/gym/log?day=${day.id}`}
-                          className="text-xs px-3 py-1.5 rounded-md bg-accent text-bg-base font-medium hover:bg-accent-dim transition-colors"
+                          className="text-xs min-h-11 inline-flex items-center px-3 py-1.5 rounded-md bg-accent text-bg-base font-medium hover:bg-accent-dim transition-colors"
                         >
                           {done ? 'Edit log' : 'Log session'}
                         </Link>
                         <Link
                           href={`/gym/exercise/${day.groups[0].exerciseIds[0]}`}
-                          className="text-xs px-3 py-1.5 rounded-md text-ink-secondary hover:text-ink-primary border border-line hover:border-accent/40 transition-colors"
+                          className="text-xs min-h-11 inline-flex items-center px-3 py-1.5 rounded-md text-ink-secondary hover:text-ink-primary border border-line hover:border-accent/40 transition-colors"
                         >
                           See form
                         </Link>
@@ -159,7 +159,7 @@ export default function GymPage() {
           <p className="text-sm text-ink-secondary mb-4 max-w-2xl">
             Targets to hit over the next 4-12 weeks. These are how you'll know you're progressing.
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {milestones.map((m) => (
               <div key={m.lift} className="bg-bg-surface border border-line rounded-lg p-4">
                 <p className="text-xs text-ink-tertiary mb-1.5">{m.lift}</p>

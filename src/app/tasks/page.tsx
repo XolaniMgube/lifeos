@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
-import { useStore, Task, TaskPriority, TaskArea } from '@/store/useStore';
+import { useStore, Task, TaskPriority, TaskArea, Goal } from '@/store/useStore';
 import { createClient } from '@/lib/supabase';
 import { taskToDb } from '@/components/DataProvider';
 
@@ -82,6 +82,7 @@ export default function TasksPage() {
   useEffect(() => setMounted(true), []);
 
   const tasks = useStore((s) => s.tasks.tasks);
+  const goals = useStore((s) => s.goals.goals);
   const storeAdd = useStore((s) => s.tasks.addTask);
   const storeUpdate = useStore((s) => s.tasks.updateTask);
   const storeDelete = useStore((s) => s.tasks.deleteTask);
@@ -144,10 +145,10 @@ export default function TasksPage() {
     <div className="flex min-h-screen bg-bg-base">
       <Sidebar />
 
-      <main className="flex-1 max-w-2xl mx-auto px-4 sm:px-8 py-8 pb-36">
+      <main className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-8 py-8 pb-56 md:pb-36">
         <div className="mb-8">
           <p className="text-xs uppercase tracking-widest text-ink-tertiary mb-2">Module · Tasks</p>
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between gap-4">
             <h1 className="display-font text-4xl font-medium text-ink-primary tracking-tightest">
               Tasks
             </h1>
@@ -172,6 +173,7 @@ export default function TasksPage() {
                 onExpand={setExpandedId}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
+                goals={goals}
               />
             ))}
           </div>
@@ -179,7 +181,7 @@ export default function TasksPage() {
       </main>
 
       {/* Sticky bottom quick-add */}
-      <div className="fixed bottom-0 left-0 right-0 bg-bg-surface border-t border-line z-10">
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-bg-surface border-t border-line z-10">
         <div className="max-w-2xl mx-auto px-4 sm:px-8 py-3">
           <div className="flex items-center gap-2 mb-2">
             <input
@@ -193,12 +195,12 @@ export default function TasksPage() {
             <button
               onClick={handleAdd}
               disabled={!addTitle.trim()}
-              className="px-4 py-3 rounded-lg bg-accent text-bg-base text-sm font-medium disabled:opacity-30 hover:bg-accent-dim transition-colors"
+              className="px-4 py-3 rounded-lg bg-accent text-bg-base text-sm font-medium disabled:opacity-30 hover:bg-accent-dim transition-colors shrink-0"
             >
               Add
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
             <DueChip
               label="Today"
               active={addDue === localDate()}
@@ -225,12 +227,14 @@ function TaskGroup({
   onExpand,
   onUpdate,
   onDelete,
+  goals,
 }: {
   group: Group;
   expandedId: string | null;
   onExpand: (id: string | null) => void;
   onUpdate: (id: string, patch: Partial<Task>) => void;
   onDelete: (id: string) => void;
+  goals: Goal[];
 }) {
   const openCount = group.tasks.filter((t) => t.status === 'open').length;
   return (
@@ -249,6 +253,7 @@ function TaskGroup({
             onExpand={() => onExpand(expandedId === task.id ? null : task.id)}
             onUpdate={onUpdate}
             onDelete={onDelete}
+            goals={goals}
           />
         ))}
       </div>
@@ -262,17 +267,25 @@ function TaskRow({
   onExpand,
   onUpdate,
   onDelete,
+  goals,
 }: {
   task: Task;
   expanded: boolean;
   onExpand: () => void;
   onUpdate: (id: string, patch: Partial<Task>) => void;
   onDelete: (id: string) => void;
+  goals: Goal[];
 }) {
   const isDone = task.status === 'done';
   const isCancelled = task.status === 'cancelled';
   const isInactive = isDone || isCancelled;
   const due = task.dueDate ? formatDue(task.dueDate) : null;
+  const linkedGoal = task.goalId ? goals.find((g) => g.id === task.goalId) : undefined;
+  const selectableGoals = goals.filter((g) => g.status === 'active' || g.status === 'paused');
+  const goalOptions =
+    linkedGoal && !selectableGoals.some((g) => g.id === linkedGoal.id)
+      ? [linkedGoal, ...selectableGoals]
+      : selectableGoals;
 
   return (
     <div
@@ -347,6 +360,11 @@ function TaskRow({
               {task.area}
             </span>
           )}
+          {linkedGoal && !isInactive && (
+            <span className="text-[10px] uppercase tracking-wider text-accent shrink-0 hidden sm:inline max-w-[120px] truncate">
+              {linkedGoal.title}
+            </span>
+          )}
           {due && (
             <span
               className={`text-[11px] mono-font shrink-0 ${
@@ -408,11 +426,11 @@ function TaskRow({
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3">
             <span className="text-xs uppercase tracking-wider text-ink-tertiary w-16 shrink-0">
               Priority
             </span>
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 flex-wrap">
               {(['high', 'medium', 'low'] as TaskPriority[]).map((p) => (
                 <button
                   key={p}
@@ -448,6 +466,24 @@ function TaskRow({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs uppercase tracking-wider text-ink-tertiary w-16 shrink-0">
+              Goal
+            </span>
+            <select
+              value={task.goalId ?? ''}
+              onChange={(e) => onUpdate(task.id, { goalId: e.target.value || undefined })}
+              className="flex-1 min-w-0 text-sm bg-bg-inset/60 border border-line rounded-md px-3 py-2 text-ink-primary focus:outline-none focus:border-accent/50 transition-colors"
+            >
+              <option value="">No goal</option>
+              {goalOptions.map((goal) => (
+                <option key={goal.id} value={goal.id}>
+                  {goal.title}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex items-center gap-2 pt-1">

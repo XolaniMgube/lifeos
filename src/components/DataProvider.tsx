@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import { useStore, SessionLog, Task } from '@/store/useStore';
+import { useStore, SessionLog, Task, Goal } from '@/store/useStore';
 
 // ── DB row → TypeScript type converters ─────────────────────────────────────
 
@@ -33,11 +33,30 @@ function dbToTask(row: any): Task {
   };
 }
 
+function dbToGoal(row: any): Goal {
+  return {
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    horizon: row.horizon,
+    createdAt: row.created_at,
+    targetDate: row.target_date ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    area: row.area ?? undefined,
+    why: row.why ?? undefined,
+    notes: row.notes ?? undefined,
+    metricLabel: row.metric_label ?? undefined,
+    currentValue: row.current_value ?? undefined,
+    targetValue: row.target_value ?? undefined,
+  };
+}
+
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const hydrateGym = useStore((s) => s.gym.hydrate);
   const hydrateTasks = useStore((s) => s.tasks.hydrate);
+  const hydrateGoals = useStore((s) => s.goals.hydrate);
   const setUserId = useStore((s) => s.setUserId);
 
   useEffect(() => {
@@ -51,7 +70,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (!user) return;
       setUserId(user.id);
 
-      const [sessionsRes, tasksRes] = await Promise.all([
+      const [sessionsRes, tasksRes, goalsRes] = await Promise.all([
         supabase
           .from('gym_sessions')
           .select('*')
@@ -62,10 +81,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: true }),
+        supabase
+          .from('goals')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true }),
       ]);
 
       if (sessionsRes.data) hydrateGym(sessionsRes.data.map(dbToSession));
       if (tasksRes.data) hydrateTasks(tasksRes.data.map(dbToTask));
+      if (goalsRes.data) hydrateGoals(goalsRes.data.map(dbToGoal));
     }
 
     load();
@@ -80,6 +105,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setUserId(null);
         hydrateGym([]);
         hydrateTasks([]);
+        hydrateGoals([]);
       }
     });
 
@@ -117,5 +143,24 @@ export function taskToDb(task: Task, userId: string) {
     notes: task.notes ?? null,
     area: task.area ?? null,
     goal_id: task.goalId ?? null,
+  };
+}
+
+export function goalToDb(goal: Goal, userId: string) {
+  return {
+    id: goal.id,
+    user_id: userId,
+    title: goal.title,
+    status: goal.status,
+    horizon: goal.horizon,
+    created_at: goal.createdAt,
+    target_date: goal.targetDate ?? null,
+    completed_at: goal.completedAt ?? null,
+    area: goal.area ?? null,
+    why: goal.why ?? null,
+    notes: goal.notes ?? null,
+    metric_label: goal.metricLabel ?? null,
+    current_value: goal.currentValue ?? null,
+    target_value: goal.targetValue ?? null,
   };
 }

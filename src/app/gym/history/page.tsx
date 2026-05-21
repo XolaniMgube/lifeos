@@ -28,7 +28,7 @@ export default function HistoryPage() {
     <div className="flex min-h-screen bg-bg-base">
       <Sidebar />
 
-      <main className="flex-1 max-w-5xl mx-auto px-8 py-10">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 pb-28 md:pb-10">
         <Link href="/gym" className="text-sm text-ink-tertiary hover:text-ink-primary mb-6 inline-flex items-center gap-1.5">
           <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
             <path d="M19 12H5M11 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -38,7 +38,7 @@ export default function HistoryPage() {
 
         <div className="mb-10">
           <p className="text-xs uppercase tracking-widest text-ink-tertiary mb-2">All cycles</p>
-          <h1 className="display-font text-4xl font-medium text-ink-primary tracking-tightest">History</h1>
+          <h1 className="display-font text-4xl sm:text-5xl font-medium text-ink-primary tracking-tightest">History</h1>
         </div>
 
         {cycleNumbers.length === 0 ? (
@@ -73,12 +73,12 @@ export default function HistoryPage() {
 
               return (
                 <div key={cycleNum} className="bg-bg-surface border border-line rounded-xl overflow-hidden">
-                  <div className="px-6 py-4 border-b border-line flex items-baseline justify-between">
+                  <div className="px-4 sm:px-6 py-4 border-b border-line flex flex-col gap-4 sm:flex-row sm:items-baseline sm:justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-widest text-ink-tertiary mb-1">Cycle</p>
                       <h2 className="display-font text-2xl text-ink-primary">#{cycleNum}</h2>
                     </div>
-                    <div className="flex gap-6 text-right">
+                    <div className="grid grid-cols-3 gap-4 sm:flex sm:gap-6 text-left sm:text-right">
                       <div>
                         <p className="mono-font text-lg text-ink-primary">{cycleSessions.length}/4</p>
                         <p className="text-[10px] uppercase tracking-wider text-ink-tertiary">days</p>
@@ -101,10 +101,10 @@ export default function HistoryPage() {
                         <Link
                           key={session.id}
                           href={`/gym/log?day=${session.dayNumber}`}
-                          className="block px-6 py-4 hover:bg-bg-inset/30 transition-colors group"
+                          className="block px-4 sm:px-6 py-4 hover:bg-bg-inset/30 transition-colors group"
                         >
-                          <div className="flex items-baseline justify-between mb-2">
-                            <div>
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between mb-2">
+                            <div className="min-w-0">
                               <span className="display-font text-lg text-ink-primary">Day {session.dayNumber}</span>
                               <span className="text-ink-tertiary ml-2">— {dayDef.name}</span>
                             </div>

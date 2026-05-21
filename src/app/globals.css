@@ -57,6 +57,7 @@
     background: rgb(var(--bg-base));
     color: rgb(var(--ink-primary));
     font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

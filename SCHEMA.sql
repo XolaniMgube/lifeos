@@ -18,8 +18,36 @@ create table if not exists gym_sessions (
 
 alter table gym_sessions enable row level security;
 
+drop policy if exists "gym_sessions: own rows only" on gym_sessions;
+
 create policy "gym_sessions: own rows only"
   on gym_sessions for all
+  using (auth.uid() = user_id);
+
+-- ── Goals ───────────────────────────────────────────────────
+create table if not exists goals (
+  id            text        primary key,
+  user_id       uuid        references auth.users not null,
+  title         text        not null,
+  status        text        not null default 'active',
+  horizon       text        not null default 'quarter',
+  created_at    text        not null,
+  target_date   text,
+  completed_at  text,
+  area          text,
+  why           text,
+  notes         text,
+  metric_label  text,
+  current_value numeric,
+  target_value  numeric
+);
+
+alter table goals enable row level security;
+
+drop policy if exists "goals: own rows only" on goals;
+
+create policy "goals: own rows only"
+  on goals for all
   using (auth.uid() = user_id);
 
 -- ── Tasks ────────────────────────────────────────────────────
@@ -37,7 +65,11 @@ create table if not exists tasks (
   goal_id      text
 );
 
+alter table tasks add column if not exists goal_id text;
+
 alter table tasks enable row level security;
+
+drop policy if exists "tasks: own rows only" on tasks;
 
 create policy "tasks: own rows only"
   on tasks for all

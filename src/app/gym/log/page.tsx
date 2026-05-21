@@ -113,7 +113,7 @@ function LogPageInner() {
     <div className="flex min-h-screen bg-bg-base">
       <Sidebar />
 
-      <main className="flex-1 max-w-3xl mx-auto px-8 py-10">
+      <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 pb-36 md:pb-10">
         {/* Header */}
         <Link href="/gym" className="text-sm text-ink-tertiary hover:text-ink-primary mb-6 inline-flex items-center gap-1.5">
           <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -126,7 +126,7 @@ function LogPageInner() {
           <p className="text-xs uppercase tracking-widest text-ink-tertiary mb-2">
             Cycle {currentCycle} · Day {day.id}
           </p>
-          <h1 className="display-font text-4xl font-medium text-ink-primary tracking-tightest mb-1">
+          <h1 className="display-font text-4xl sm:text-5xl font-medium text-ink-primary tracking-tightest mb-1">
             {day.name}
           </h1>
           <p className="text-ink-secondary">{day.subtitle}</p>
@@ -166,7 +166,7 @@ function LogPageInner() {
         {/* How did it feel */}
         <div className="mb-8">
           <h2 className="text-xs uppercase tracking-widest text-ink-tertiary mb-3">How did it feel?</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {(['great', 'good', 'tough', 'rough'] as const).map((f) => (
               <button
                 key={f}
@@ -184,16 +184,16 @@ function LogPageInner() {
         </div>
 
         {/* Save bar */}
-        <div className="sticky bottom-0 bg-bg-base border-t border-line py-4 -mx-8 px-8 flex justify-end gap-3">
+        <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-0 bg-bg-base border-t border-line py-3 sm:py-4 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 flex justify-end gap-3">
           <Link
             href="/gym"
-            className="px-4 py-2.5 rounded-md text-sm text-ink-secondary border border-line hover:border-ink-tertiary transition-colors"
+            className="min-h-11 inline-flex items-center px-4 py-2.5 rounded-md text-sm text-ink-secondary border border-line hover:border-ink-tertiary transition-colors"
           >
             Cancel
           </Link>
           <button
             onClick={handleSave}
-            className="px-5 py-2.5 rounded-md text-sm bg-accent text-bg-base font-medium hover:bg-accent-dim transition-colors"
+            className="min-h-11 px-5 py-2.5 rounded-md text-sm bg-accent text-bg-base font-medium hover:bg-accent-dim transition-colors"
           >
             Save session
           </button>
@@ -224,9 +224,9 @@ function ExerciseBlock({
   const [showLast, setShowLast] = useState(false);
 
   return (
-    <div className="bg-bg-surface border border-line rounded-xl p-5 mb-3">
-      <div className="flex items-start justify-between mb-4">
-        <div>
+    <div className="bg-bg-surface border border-line rounded-lg sm:rounded-xl p-4 sm:p-5 mb-3">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
           <Link href={`/gym/exercise/${exercise.id}`} className="display-font text-lg text-ink-primary hover:text-accent transition-colors">
             {exercise.name}
           </Link>
@@ -263,7 +263,7 @@ function ExerciseBlock({
       <div className="space-y-2">
         {log.sets.map((set, setIdx) => (
           <div key={setIdx} className="flex items-center gap-2">
-            <span className="mono-font text-xs text-ink-tertiary w-8 text-center">
+            <span className="mono-font text-xs text-ink-tertiary w-7 sm:w-8 text-center shrink-0">
               {String(setIdx + 1).padStart(2, '0')}
             </span>
 
@@ -316,7 +316,7 @@ function ExerciseBlock({
             {log.sets.length > 1 && (
               <button
                 onClick={() => onRemoveSet(exerciseIdx, setIdx)}
-                className="text-ink-faint hover:text-muscle-chest transition-colors p-1"
+                className="text-ink-faint hover:text-muscle-chest transition-colors p-2 -mr-1 shrink-0"
                 aria-label="Remove set"
               >
                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -363,7 +363,7 @@ function SetInput({
   wide?: boolean;
 }) {
   return (
-    <div className={`flex items-center bg-bg-inset/70 border border-line rounded-md focus-within:border-accent/50 transition-colors ${wide ? 'flex-1' : 'w-24'}`}>
+    <div className={`flex items-center bg-bg-inset/70 border border-line rounded-md focus-within:border-accent/50 transition-colors min-w-0 ${wide ? 'flex-1' : 'w-20 sm:w-24'}`}>
       <input
         type="number"
         inputMode="decimal"
@@ -371,9 +371,9 @@ function SetInput({
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-transparent px-3 py-2 text-sm mono-font text-ink-primary placeholder-ink-faint focus:outline-none text-right"
+        className="w-full min-w-0 bg-transparent px-2 sm:px-3 py-2.5 text-sm mono-font text-ink-primary placeholder-ink-faint focus:outline-none text-right"
       />
-      <span className="text-[10px] uppercase tracking-wider text-ink-tertiary px-2">{unit}</span>
+      <span className="text-[10px] uppercase tracking-wider text-ink-tertiary px-1.5 sm:px-2 shrink-0">{unit}</span>
     </div>
   );
 }

@@ -22,7 +22,7 @@ export default function ExerciseDetailPage() {
     return (
       <div className="flex min-h-screen bg-bg-base">
         <Sidebar />
-        <main className="flex-1 p-10">
+        <main className="flex-1 p-4 sm:p-10 pb-28 md:pb-10">
           <p>Exercise not found.</p>
         </main>
       </div>
@@ -38,7 +38,7 @@ export default function ExerciseDetailPage() {
     <div className="flex min-h-screen bg-bg-base">
       <Sidebar />
 
-      <main className="flex-1 max-w-4xl mx-auto px-8 py-10">
+      <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 pb-28 md:pb-10">
         <button
           onClick={() => router.back()}
           className="text-sm text-ink-tertiary hover:text-ink-primary mb-6 inline-flex items-center gap-1.5"
@@ -60,10 +60,10 @@ export default function ExerciseDetailPage() {
             {' · '}
             <span className="capitalize">{exercise.group}</span>
           </p>
-          <h1 className="display-font text-4xl font-medium text-ink-primary tracking-tightest mb-3">
+          <h1 className="display-font text-4xl sm:text-5xl font-medium text-ink-primary tracking-tightest mb-3">
             {exercise.name}
           </h1>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Tag>{exercise.defaultSets} sets</Tag>
             {exercise.defaultReps && <Tag>{exercise.defaultReps} reps</Tag>}
             <Tag>{exercise.trackingType.replace('-', ' / ')}</Tag>
@@ -72,7 +72,7 @@ export default function ExerciseDetailPage() {
 
         {/* Image */}
         <div className="bg-bg-surface border border-line rounded-xl overflow-hidden mb-8 grain">
-          <div className="aspect-video w-full bg-bg-inset relative">
+          <div className="aspect-[4/3] sm:aspect-video w-full bg-bg-inset relative">
             <img
               src={exercise.imageUrl}
               alt={exercise.name}
@@ -142,7 +142,7 @@ export default function ExerciseDetailPage() {
           <div className="mt-10 pt-8 border-t border-line">
             <Link
               href={`/gym/log?day=${parentDay.id}`}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-accent text-bg-base font-medium text-sm hover:bg-accent-dim transition-colors"
+              className="inline-flex min-h-11 items-center gap-2 px-4 py-2.5 rounded-md bg-accent text-bg-base font-medium text-sm hover:bg-accent-dim transition-colors"
             >
               Log Day {parentDay.id} session
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

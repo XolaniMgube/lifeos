@@ -23,12 +23,38 @@ export type Task = {
 
 export type TasksSlice = {
   tasks: Task[];
-  // Called from DataProvider on mount — replaces entire list
   hydrate: (tasks: Task[]) => void;
-  // Accept a full pre-built Task so callers can also insert the same object to Supabase
   addTask: (task: Task) => void;
   updateTask: (id: string, patch: Partial<Task>) => void;
   deleteTask: (id: string) => void;
+};
+
+// === Goals slice types ===
+export type GoalStatus = 'active' | 'paused' | 'done' | 'dropped';
+export type GoalHorizon = 'quarter' | 'year' | 'long-term';
+
+export type Goal = {
+  id: string;
+  title: string;
+  status: GoalStatus;
+  horizon: GoalHorizon;
+  createdAt: string;
+  targetDate?: string;
+  completedAt?: string;
+  area?: TaskArea;
+  why?: string;
+  notes?: string;
+  metricLabel?: string;
+  currentValue?: number;
+  targetValue?: number;
+};
+
+export type GoalsSlice = {
+  goals: Goal[];
+  hydrate: (goals: Goal[]) => void;
+  addGoal: (goal: Goal) => void;
+  updateGoal: (id: string, patch: Partial<Goal>) => void;
+  deleteGoal: (id: string) => void;
 };
 
 // === Gym slice types ===
@@ -57,7 +83,6 @@ export type SessionLog = {
 export type GymSlice = {
   sessions: SessionLog[];
   currentCycle: number;
-  // Called from DataProvider on mount
   hydrate: (sessions: SessionLog[]) => void;
   saveSession: (session: SessionLog) => void;
   deleteSession: (id: string) => void;
@@ -72,6 +97,7 @@ type AppState = {
   // Modules
   gym: GymSlice;
   tasks: TasksSlice;
+  goals: GoalsSlice;
 };
 
 function computeCurrentCycle(sessions: SessionLog[]): number {
@@ -141,6 +167,37 @@ export const useStore = create<AppState>()(
         deleteTask: (id) =>
           set((s) => ({
             tasks: { ...s.tasks, tasks: s.tasks.tasks.filter((t) => t.id !== id) },
+          })),
+      },
+
+      goals: {
+        goals: [],
+        hydrate: (goals) => set((s) => ({ goals: { ...s.goals, goals } })),
+        addGoal: (goal) =>
+          set((s) => ({ goals: { ...s.goals, goals: [...s.goals.goals, goal] } })),
+        updateGoal: (id, patch) =>
+          set((s) => ({
+            goals: {
+              ...s.goals,
+              goals: s.goals.goals.map((g) => {
+                if (g.id !== id) return g;
+                const completedAt =
+                  patch.status === 'done' && !g.completedAt
+                    ? new Date().toISOString()
+                    : patch.status && patch.status !== 'done'
+                    ? undefined
+                    : g.completedAt;
+                return { ...g, ...patch, completedAt };
+              }),
+            },
+          })),
+        deleteGoal: (id) =>
+          set((s) => ({
+            goals: { ...s.goals, goals: s.goals.goals.filter((g) => g.id !== id) },
+            tasks: {
+              ...s.tasks,
+              tasks: s.tasks.tasks.map((t) => (t.goalId === id ? { ...t, goalId: undefined } : t)),
+            },
           })),
       },
     }),

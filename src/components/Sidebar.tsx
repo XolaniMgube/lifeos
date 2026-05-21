@@ -8,8 +8,8 @@ const navItems = [
   { href: '/', label: 'Today', icon: 'home' },
   { href: '/tasks', label: 'Tasks', icon: 'tasks' },
   { href: '/gym', label: 'Gym', icon: 'dumbbell' },
+  { href: '/goals', label: 'Goals', icon: 'target' },
   { href: '/habits', label: 'Habits', icon: 'check', soon: true },
-  { href: '/goals', label: 'Goals', icon: 'target', soon: true },
   { href: '/finance', label: 'Finance', icon: 'wallet', soon: true },
 ];
 
@@ -19,55 +19,88 @@ export function Sidebar() {
   const toggleTheme = useStore((s) => s.toggleTheme);
 
   return (
-    <aside className="w-64 border-r border-line bg-bg-surface flex flex-col h-screen sticky top-0 shrink-0">
-      <div className="p-6 border-b border-line">
-        <div className="flex items-baseline gap-2">
-          <span className="display-font text-2xl font-medium text-ink-primary">X</span>
-          <span className="text-xs uppercase tracking-widest text-ink-tertiary">Life OS</span>
+    <>
+      <aside className="hidden md:flex w-64 border-r border-line bg-bg-surface flex-col h-screen sticky top-0 shrink-0">
+        <div className="p-6 border-b border-line">
+          <div className="flex items-baseline gap-2">
+            <span className="display-font text-2xl font-medium text-ink-primary">X</span>
+            <span className="text-xs uppercase tracking-widest text-ink-tertiary">Life OS</span>
+          </div>
+          <p className="text-xs text-ink-tertiary mt-1 italic display-font">consistency over intensity</p>
         </div>
-        <p className="text-xs text-ink-tertiary mt-1 italic display-font">consistency over intensity</p>
-      </div>
 
-      <nav className="flex-1 p-3">
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== '/' && pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.href}
-              href={item.soon ? '#' : item.href}
-              className={`group flex items-center justify-between px-3 py-2.5 rounded-md text-sm transition-colors mb-0.5 ${
-                isActive
-                  ? 'bg-bg-inset text-ink-primary'
-                  : 'text-ink-secondary hover:text-ink-primary hover:bg-bg-inset/50'
-              } ${item.soon ? 'cursor-not-allowed opacity-50' : ''}`}
-            >
-              <span className="flex items-center gap-3">
+        <nav className="flex-1 p-3">
+          {navItems.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== '/' && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.soon ? '#' : item.href}
+                className={`group flex items-center justify-between px-3 py-2.5 rounded-md text-sm transition-colors mb-0.5 ${
+                  isActive
+                    ? 'bg-bg-inset text-ink-primary'
+                    : 'text-ink-secondary hover:text-ink-primary hover:bg-bg-inset/50'
+                } ${item.soon ? 'cursor-not-allowed opacity-50' : ''}`}
+              >
+                <span className="flex items-center gap-3">
+                  <Icon name={item.icon} />
+                  {item.label}
+                </span>
+                {item.soon && (
+                  <span className="text-[10px] uppercase tracking-wider text-ink-faint">soon</span>
+                )}
+                {isActive && !item.soon && (
+                  <span className="w-1 h-1 rounded-full bg-accent" />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-3 border-t border-line">
+          <button
+            onClick={toggleTheme}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-ink-secondary hover:text-ink-primary hover:bg-bg-inset/50 transition-colors"
+          >
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+            {theme === 'dark' ? 'Light' : 'Dark'} mode
+          </button>
+        </div>
+      </aside>
+
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-line bg-bg-surface/95 backdrop-blur pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+        <div className="grid grid-cols-5 gap-1 px-2 pt-2 pb-2">
+          {[navItems[0], navItems[1], navItems[3], navItems[2]].map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== '/' && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-md text-[10px] transition-colors ${
+                  isActive
+                    ? 'bg-bg-inset text-accent'
+                    : 'text-ink-tertiary active:bg-bg-inset/70'
+                }`}
+              >
                 <Icon name={item.icon} />
-                {item.label}
-              </span>
-              {item.soon && (
-                <span className="text-[10px] uppercase tracking-wider text-ink-faint">soon</span>
-              )}
-              {isActive && !item.soon && (
-                <span className="w-1 h-1 rounded-full bg-accent" />
-              )}
-            </Link>
-          );
-        })}
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            onClick={toggleTheme}
+            className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-md text-[10px] text-ink-tertiary active:bg-bg-inset/70 transition-colors"
+          >
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          </button>
+        </div>
       </nav>
-
-      <div className="p-3 border-t border-line">
-        <button
-          onClick={toggleTheme}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-ink-secondary hover:text-ink-primary hover:bg-bg-inset/50 transition-colors"
-        >
-          <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
-          {theme === 'dark' ? 'Light' : 'Dark'} mode
-        </button>
-      </div>
-    </aside>
+    </>
   );
 }
 
