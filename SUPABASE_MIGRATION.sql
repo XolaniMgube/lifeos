@@ -19,6 +19,26 @@ create index if not exists tasks_user_status_idx on tasks (user_id, status);
 create index if not exists tasks_user_due_date_idx on tasks (user_id, due_date);
 create index if not exists tasks_goal_id_idx on tasks (goal_id);
 
+-- Keep task values inside the states understood by the application. NOT VALID
+-- avoids blocking the migration if an old experimental row has another value,
+-- while enforcing these rules for all new and changed rows.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'tasks_status_check' and conrelid = 'tasks'::regclass) then
+    alter table tasks add constraint tasks_status_check
+      check (status in ('open', 'done', 'cancelled')) not valid;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'tasks_priority_check' and conrelid = 'tasks'::regclass) then
+    alter table tasks add constraint tasks_priority_check
+      check (priority in ('high', 'medium', 'low')) not valid;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'tasks_area_check' and conrelid = 'tasks'::regclass) then
+    alter table tasks add constraint tasks_area_check
+      check (area is null or area in ('health', 'finance', 'growth', 'work', 'personal')) not valid;
+  end if;
+end;
+$$;
+
 -- Attach tasks to real goals. NOT VALID permits any old orphaned links while
 -- enforcing the relationship for every new write.
 do $$

@@ -92,6 +92,9 @@ export type GymSlice = {
 type AppState = {
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  dataStatus: 'loading' | 'ready' | 'error';
+  dataError: string | null;
+  setDataStatus: (status: 'loading' | 'ready' | 'error', error?: string | null) => void;
   userId: string | null;
   userEmail: string | null;
   setUserId: (id: string | null) => void;
@@ -118,6 +121,9 @@ export const useStore = create<AppState>()(
     (set) => ({
       theme: 'dark',
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+      dataStatus: 'loading',
+      dataError: null,
+      setDataStatus: (status, error = null) => set({ dataStatus: status, dataError: error }),
       userId: null,
       userEmail: null,
       setUserId: (id) => set({ userId: id }),
@@ -161,9 +167,13 @@ export const useStore = create<AppState>()(
               tasks: s.tasks.tasks.map((t) => {
                 if (t.id !== id) return t;
                 const completedAt =
-                  patch.status === 'done' && !t.completedAt
-                    ? new Date().toISOString()
-                    : t.completedAt;
+                  patch.completedAt !== undefined
+                    ? patch.completedAt
+                    : patch.status === 'done' && !t.completedAt
+                      ? new Date().toISOString()
+                      : patch.status && patch.status !== 'done'
+                        ? undefined
+                        : t.completedAt;
                 return { ...t, ...patch, completedAt };
               }),
             },

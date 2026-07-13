@@ -60,16 +60,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const hydrateGoals = useStore((s) => s.goals.hydrate);
   const setUserId = useStore((s) => s.setUserId);
   const setUserEmail = useStore((s) => s.setUserEmail);
+  const setDataStatus = useStore((s) => s.setDataStatus);
 
   useEffect(() => {
     const supabase = createClient();
 
     async function load() {
+      setDataStatus('loading');
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (!user) return;
+      if (authError) {
+        setDataStatus('error', authError.message);
+        return;
+      }
+      if (!user) {
+        setDataStatus('ready');
+        return;
+      }
       setUserId(user.id);
       setUserEmail(user.email ?? null);
 
@@ -98,6 +108,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (sessionsRes.data) hydrateGym(sessionsRes.data.map(dbToSession));
       if (tasksRes.data) hydrateTasks(tasksRes.data.map(dbToTask));
       if (goalsRes.data) hydrateGoals(goalsRes.data.map(dbToGoal));
+
+      const loadError = sessionsRes.error ?? tasksRes.error ?? goalsRes.error;
+      setDataStatus(loadError ? 'error' : 'ready', loadError?.message ?? null);
     }
 
     load();
@@ -115,6 +128,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         hydrateGym([]);
         hydrateTasks([]);
         hydrateGoals([]);
+        setDataStatus('ready');
       }
     });
 

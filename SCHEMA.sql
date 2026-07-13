@@ -65,13 +65,15 @@ create table if not exists tasks (
   id           text        primary key,
   user_id      uuid        references auth.users not null,
   title        text        not null,
-  status       text        not null default 'open',
-  priority     text        not null default 'medium',
+  status       text        not null default 'open'
+                           constraint tasks_status_check check (status in ('open', 'done', 'cancelled')),
+  priority     text        not null default 'medium'
+                           constraint tasks_priority_check check (priority in ('high', 'medium', 'low')),
   due_date     text,       -- 'YYYY-MM-DD' local date string
   completed_at text,       -- ISO datetime string
   created_at   text        not null,
   notes        text,
-  area         text,
+  area         text        constraint tasks_area_check check (area is null or area in ('health', 'finance', 'growth', 'work', 'personal')),
   goal_id      text references goals(id) on delete set null,
   updated_at   timestamptz not null default now()
 );

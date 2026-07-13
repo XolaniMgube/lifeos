@@ -6,6 +6,7 @@ import { useStore, Task, TaskPriority, TaskArea, Goal } from '@/store/useStore';
 import { createClient } from '@/lib/supabase';
 import { taskToDb } from '@/components/DataProvider';
 import { SaveStatus } from '@/components/SaveStatus';
+import { DataStatusPanel } from '@/components/DataStatusPanel';
 import { useSaveStatus } from '@/hooks/useSaveStatus';
 import { features } from '@/config/features';
 
@@ -109,6 +110,8 @@ export default function TasksPage() {
   const storeUpdate = useStore((s) => s.tasks.updateTask);
   const storeDelete = useStore((s) => s.tasks.deleteTask);
   const userId = useStore((s) => s.userId);
+  const dataStatus = useStore((s) => s.dataStatus);
+  const dataError = useStore((s) => s.dataError);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [addTitle, setAddTitle] = useState('');
@@ -117,6 +120,7 @@ export default function TasksPage() {
   const [view, setView] = useState<TaskView>('open');
   const [query, setQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
+  const [areaFilter, setAreaFilter] = useState<TaskArea | 'all'>('all');
   const save = useSaveStatus();
 
   function reportExpiredSession() {
@@ -125,7 +129,7 @@ export default function TasksPage() {
 
   async function handleAdd() {
     const title = addTitle.trim();
-    if (!title || save.state === 'saving') return;
+    if (!title || save.state === 'saving' || dataStatus !== 'ready') return;
     if (!userId) return reportExpiredSession();
 
     const task: Task = {
@@ -191,10 +195,11 @@ export default function TasksPage() {
   const normalizedQuery = query.trim().toLowerCase();
   const filteredTasks = tasks.filter((task) => {
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
+    const matchesArea = areaFilter === 'all' || task.area === areaFilter;
     const matchesQuery = !normalizedQuery
       || task.title.toLowerCase().includes(normalizedQuery)
       || task.notes?.toLowerCase().includes(normalizedQuery);
-    return matchesPriority && matchesQuery;
+    return matchesPriority && matchesArea && matchesQuery;
   });
   const groups = mounted ? groupTasks(filteredTasks, view) : [];
   const openCount = tasks.filter((t) => t.status === 'open').length;
@@ -233,7 +238,7 @@ export default function TasksPage() {
             <ViewTab label="Upcoming" count={upcomingCount} active={view === 'upcoming'} onClick={() => setView('upcoming')} />
             <ViewTab label="Completed" count={completedCount} active={view === 'completed'} onClick={() => setView('completed')} />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-bg-surface px-3 focus-within:border-accent/40">
               <SearchIcon />
               <input
@@ -244,24 +249,39 @@ export default function TasksPage() {
                 className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-ink-primary placeholder:text-ink-faint focus:outline-none"
               />
             </label>
-            <select
-              value={priorityFilter}
-              onChange={(event) => setPriorityFilter(event.target.value as TaskPriority | 'all')}
-              aria-label="Filter by priority"
-              className="rounded-lg border border-line bg-bg-surface px-3 text-xs text-ink-secondary focus:border-accent/40 focus:outline-none"
-            >
-              <option value="all">All priorities</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={priorityFilter}
+                onChange={(event) => setPriorityFilter(event.target.value as TaskPriority | 'all')}
+                aria-label="Filter by priority"
+                className="min-w-0 rounded-lg border border-line bg-bg-surface px-3 py-2.5 text-xs text-ink-secondary focus:border-accent/40 focus:outline-none"
+              >
+                <option value="all">All priorities</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <select
+                value={areaFilter}
+                onChange={(event) => setAreaFilter(event.target.value as TaskArea | 'all')}
+                aria-label="Filter by area"
+                className="min-w-0 rounded-lg border border-line bg-bg-surface px-3 py-2.5 text-xs capitalize text-ink-secondary focus:border-accent/40 focus:outline-none"
+              >
+                <option value="all">All areas</option>
+                {(['health', 'finance', 'growth', 'work', 'personal'] as TaskArea[]).map((area) => (
+                  <option key={area} value={area}>{area}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        {groups.length === 0 ? (
+        {dataStatus !== 'ready' ? (
+          <DataStatusPanel status={dataStatus} error={dataError} />
+        ) : groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <p className="text-ink-tertiary text-sm mb-1">
-              {query || priorityFilter !== 'all' ? 'No matching tasks.' : `No ${view} tasks.`}
+              {query || priorityFilter !== 'all' || areaFilter !== 'all' ? 'No matching tasks.' : `No ${view} tasks.`}
             </p>
             <p className="text-ink-faint text-xs">
               {view === 'completed' ? 'Completed tasks will appear here.' : 'Add one below when you are ready.'}
@@ -298,7 +318,7 @@ export default function TasksPage() {
             />
             <button
               onClick={handleAdd}
-              disabled={!addTitle.trim() || save.state === 'saving'}
+              disabled={!addTitle.trim() || save.state === 'saving' || dataStatus !== 'ready'}
               className="px-4 py-3 rounded-lg bg-accent text-bg-base text-sm font-medium disabled:opacity-30 hover:bg-accent-dim transition-colors shrink-0"
             >
               Add
@@ -638,7 +658,11 @@ function TaskRow({
               {isCancelled ? 'Reopen' : "Won't do"}
             </button>
             <button
-              onClick={() => onDelete(task.id)}
+              onClick={() => {
+                if (window.confirm(`Delete “${task.title}”? This cannot be undone.`)) {
+                  onDelete(task.id);
+                }
+              }}
               className="text-xs text-ink-faint hover:text-muscle-chest border border-line rounded-md px-3 py-1.5 transition-colors ml-auto"
             >
               Delete

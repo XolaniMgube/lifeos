@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Sidebar } from '@/components/Sidebar';
 import { SaveStatus } from '@/components/SaveStatus';
+import { DataStatusPanel } from '@/components/DataStatusPanel';
 import { taskToDb } from '@/components/DataProvider';
 import { useSaveStatus } from '@/hooks/useSaveStatus';
 import { createClient } from '@/lib/supabase';
@@ -26,6 +27,8 @@ export default function HomePage() {
   const addTask = useStore((state) => state.tasks.addTask);
   const updateTask = useStore((state) => state.tasks.updateTask);
   const userId = useStore((state) => state.userId);
+  const dataStatus = useStore((state) => state.dataStatus);
+  const dataError = useStore((state) => state.dataError);
   const save = useSaveStatus();
   const today = new Date();
   const todayKey = localDate(today);
@@ -63,7 +66,7 @@ export default function HomePage() {
   async function handleAdd(event: React.FormEvent) {
     event.preventDefault();
     const title = addTitle.trim();
-    if (!title || save.state === 'saving') return;
+    if (!title || save.state === 'saving' || dataStatus !== 'ready') return;
     if (!userId) return reportExpiredSession();
 
     const task: Task = {
@@ -90,7 +93,7 @@ export default function HomePage() {
   }
 
   async function handleComplete(task: Task) {
-    if (save.state === 'saving') return;
+    if (save.state === 'saving' || dataStatus !== 'ready') return;
     if (!userId) return reportExpiredSession();
 
     const completed: Task = {
@@ -134,11 +137,18 @@ export default function HomePage() {
                 {getGreeting(today)}, X.
               </h1>
               <p className="mt-3 text-sm leading-6 text-ink-secondary">
-                {getBriefing(taskSummary.dueToday, taskSummary.completedToday, taskSummary.open)}
+                {dataStatus === 'loading'
+                  ? 'Loading your day…'
+                  : dataStatus === 'error'
+                    ? 'Your tasks are temporarily unavailable.'
+                    : getBriefing(taskSummary.dueToday, taskSummary.completedToday, taskSummary.open)}
               </p>
             </div>
           </header>
 
+          {dataStatus !== 'ready' ? (
+            <DataStatusPanel status={dataStatus} error={dataError} />
+          ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.65fr)]">
             <section className="briefing-card animate-rise overflow-hidden rounded-[1.4rem] border border-line bg-bg-surface shadow-[0_24px_80px_rgb(0_0_0/0.12)] [animation-delay:70ms]">
               <div className="flex flex-col gap-7 p-5 sm:p-7 lg:p-8">
@@ -164,7 +174,7 @@ export default function HomePage() {
                   />
                   <button
                     type="submit"
-                    disabled={!addTitle.trim() || save.state === 'saving'}
+                    disabled={!addTitle.trim() || save.state === 'saving' || dataStatus !== 'ready'}
                     className="shrink-0 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-bg-base transition-colors hover:bg-accent-dim disabled:opacity-35"
                   >
                     {save.state === 'saving' && addTitle.trim() ? 'Saving…' : 'Add'}
@@ -217,6 +227,7 @@ export default function HomePage() {
               </Link>
             </aside>
           </div>
+          )}
         </div>
       </main>
     </div>
