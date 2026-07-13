@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Sidebar } from '@/components/Sidebar';
 import { goalToDb } from '@/components/DataProvider';
+import { SaveStatus } from '@/components/SaveStatus';
 import { createClient } from '@/lib/supabase';
+import { useSaveStatus } from '@/hooks/useSaveStatus';
 import { Goal, GoalHorizon, GoalStatus, Task, TaskArea, useStore } from '@/store/useStore';
 
 const AREAS: TaskArea[] = ['health', 'finance', 'growth', 'work', 'personal'];
@@ -93,6 +95,7 @@ export default function GoalsPage() {
   const [addTitle, setAddTitle] = useState('');
   const [addHorizon, setAddHorizon] = useState<GoalHorizon>('quarter');
   const [addArea, setAddArea] = useState<TaskArea | undefined>(undefined);
+  const save = useSaveStatus();
 
   const groups = useMemo(() => groupGoals(goals), [goals]);
   const activeGoals = goals.filter((g) => g.status === 'active');
@@ -100,12 +103,17 @@ export default function GoalsPage() {
     (t) => t.goalId && t.status === 'open' && activeGoals.some((g) => g.id === t.goalId)
   ).length;
 
-  function handleAdd() {
+  function reportExpiredSession() {
+    void save.run(async () => ({ error: { message: 'Your session expired. Sign in again.' } }));
+  }
+
+  async function handleAdd() {
     const title = addTitle.trim();
-    if (!title) return;
+    if (!title || save.state === 'saving') return;
+    if (!userId) return reportExpiredSession();
 
     const goal: Goal = {
-      id: `goal-${Date.now()}`,
+      id: crypto.randomUUID(),
       title,
       status: 'active',
       horizon: addHorizon,
@@ -113,42 +121,68 @@ export default function GoalsPage() {
       createdAt: new Date().toISOString(),
     };
 
-    storeAdd(goal);
-
-    if (userId) {
-      createClient().from('goals').insert(goalToDb(goal, userId));
-    }
-
-    setAddTitle('');
-    setAddHorizon('quarter');
-    setAddArea(undefined);
+    await save.run(async () => {
+      const result = await createClient()
+        .from('goals')
+        .upsert(goalToDb(goal, userId))
+        .select('id')
+        .single();
+      if (!result.error) {
+        storeAdd(goal);
+        setAddTitle('');
+        setAddHorizon('quarter');
+        setAddArea(undefined);
+      }
+      return result;
+    });
   }
 
   function handleUpdate(id: string, patch: Partial<Goal>) {
+    if (!userId) return reportExpiredSession();
     storeUpdate(id, patch);
 
-    if (userId) {
-      const updated = useStore.getState().goals.goals.find((g) => g.id === id);
-      if (updated) {
-        createClient().from('goals').update(goalToDb(updated, userId)).eq('id', id);
-      }
+    const updated = useStore.getState().goals.goals.find((goal) => goal.id === id);
+    if (updated) {
+      const row = goalToDb(updated, userId);
+      save.schedule(`goal:${id}`, async () =>
+        await createClient()
+          .from('goals')
+          .update(row)
+          .eq('id', id)
+          .eq('user_id', userId)
+          .select('id')
+          .single()
+      );
     }
   }
 
-  function handleDelete(id: string) {
-    storeDelete(id);
-
-    if (userId) {
+  async function handleDelete(id: string) {
+    if (!userId) return reportExpiredSession();
+    await save.run(async () => {
       const supabase = createClient();
-      supabase.from('tasks').update({ goal_id: null }).eq('goal_id', id);
-      supabase.from('goals').delete().eq('id', id);
-    }
+      const unlink = await supabase
+        .from('tasks')
+        .update({ goal_id: null })
+        .eq('goal_id', id)
+        .eq('user_id', userId);
+      if (unlink.error) return unlink;
+      const result = await supabase
+        .from('goals')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select('id')
+        .single();
+      if (!result.error) storeDelete(id);
+      return result;
+    });
   }
 
   if (!mounted) return null;
 
   return (
     <div className="flex min-h-screen bg-bg-base">
+      <SaveStatus state={save.state} message={save.message} onRetry={save.retry} />
       <Sidebar />
 
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-8 py-8 pb-56 md:pb-36">
@@ -212,7 +246,7 @@ export default function GoalsPage() {
             />
             <button
               onClick={handleAdd}
-              disabled={!addTitle.trim()}
+              disabled={!addTitle.trim() || save.state === 'saving'}
               className="px-4 py-3 rounded-lg bg-accent text-bg-base text-sm font-medium disabled:opacity-30 hover:bg-accent-dim transition-colors shrink-0"
             >
               Add

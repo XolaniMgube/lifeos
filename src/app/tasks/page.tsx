@@ -5,6 +5,9 @@ import { Sidebar } from '@/components/Sidebar';
 import { useStore, Task, TaskPriority, TaskArea, Goal } from '@/store/useStore';
 import { createClient } from '@/lib/supabase';
 import { taskToDb } from '@/components/DataProvider';
+import { SaveStatus } from '@/components/SaveStatus';
+import { useSaveStatus } from '@/hooks/useSaveStatus';
+import { features } from '@/config/features';
 
 // ── Date helpers (local time, no UTC shift) ──────────────────────────────────
 
@@ -45,14 +48,35 @@ function formatDue(dueDate: string): { label: string; overdue: boolean } {
 // ── Grouping ─────────────────────────────────────────────────────────────────
 
 type Group = { key: string; label: string; tasks: Task[] };
+type TaskView = 'open' | 'today' | 'upcoming' | 'completed';
 
-function groupTasks(tasks: Task[]): Group[] {
+function groupTasks(tasks: Task[], view: TaskView): Group[] {
   const today = localDate();
   const week = localDate(7);
 
+  if (view === 'completed') {
+    const completed = tasks
+      .filter((task) => task.status === 'done')
+      .sort((a, b) => (b.completedAt ?? b.createdAt).localeCompare(a.completedAt ?? a.createdAt));
+    const cancelled = tasks
+      .filter((task) => task.status === 'cancelled')
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return [
+      { key: 'completed', label: 'Completed', tasks: completed },
+      { key: 'cancelled', label: 'Not doing', tasks: cancelled },
+    ].filter((group) => group.tasks.length > 0);
+  }
+
+  const open = tasks.filter((task) => {
+    if (task.status !== 'open') return false;
+    if (view === 'today') return Boolean(task.dueDate && task.dueDate <= today);
+    if (view === 'upcoming') return Boolean(task.dueDate && task.dueDate > today);
+    return true;
+  });
+
   const buckets: Record<string, Task[]> = { today: [], week: [], later: [], none: [] };
 
-  for (const t of tasks) {
+  for (const t of open) {
     if (!t.dueDate) buckets.none.push(t);
     else if (t.dueDate <= today) buckets.today.push(t);
     else if (t.dueDate <= week) buckets.week.push(t);
@@ -60,12 +84,10 @@ function groupTasks(tasks: Task[]): Group[] {
   }
 
   const priorityOrder: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 };
-  const sort = (arr: Task[]) => [
-    ...arr
-      .filter((t) => t.status === 'open')
-      .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]),
-    ...arr.filter((t) => t.status !== 'open'),
-  ];
+  const sort = (arr: Task[]) => [...arr].sort(
+    (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]
+      || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999')
+  );
 
   return [
     { key: 'today', label: 'Today', tasks: sort(buckets.today) },
@@ -92,13 +114,22 @@ export default function TasksPage() {
   const [addTitle, setAddTitle] = useState('');
   const [addDue, setAddDue] = useState<string | undefined>(undefined);
   const [addPriority, setAddPriority] = useState<TaskPriority>('medium');
+  const [view, setView] = useState<TaskView>('open');
+  const [query, setQuery] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
+  const save = useSaveStatus();
 
-  function handleAdd() {
+  function reportExpiredSession() {
+    void save.run(async () => ({ error: { message: 'Your session expired. Sign in again.' } }));
+  }
+
+  async function handleAdd() {
     const title = addTitle.trim();
-    if (!title) return;
+    if (!title || save.state === 'saving') return;
+    if (!userId) return reportExpiredSession();
 
     const task: Task = {
-      id: `task-${Date.now()}`,
+      id: crypto.randomUUID(),
       title,
       status: 'open',
       priority: addPriority,
@@ -106,43 +137,80 @@ export default function TasksPage() {
       createdAt: new Date().toISOString(),
     };
 
-    storeAdd(task);
-
-    if (userId) {
-      createClient().from('tasks').insert(taskToDb(task, userId));
-    }
-
-    setAddTitle('');
-    setAddDue(undefined);
-    setAddPriority('medium');
+    await save.run(async () => {
+      const result = await createClient()
+        .from('tasks')
+        .upsert(taskToDb(task, userId))
+        .select('id')
+        .single();
+      if (!result.error) {
+        storeAdd(task);
+        setAddTitle('');
+        setAddDue(undefined);
+        setAddPriority('medium');
+        setView(task.dueDate === localDate() ? 'today' : 'open');
+      }
+      return result;
+    });
   }
 
   function handleUpdate(id: string, patch: Partial<Task>) {
+    if (!userId) return reportExpiredSession();
     storeUpdate(id, patch);
 
-    if (userId) {
-      const updated = useStore.getState().tasks.tasks.find((t) => t.id === id);
-      if (updated) {
-        const row = taskToDb({ ...updated, ...patch }, userId);
-        createClient().from('tasks').update(row).eq('id', id);
-      }
+    const updated = useStore.getState().tasks.tasks.find((task) => task.id === id);
+    if (updated) {
+      const row = taskToDb(updated, userId);
+      save.schedule(`task:${id}`, async () =>
+        await createClient()
+          .from('tasks')
+          .update(row)
+          .eq('id', id)
+          .eq('user_id', userId)
+          .select('id')
+          .single()
+      );
     }
   }
 
-  function handleDelete(id: string) {
-    storeDelete(id);
-    if (userId) {
-      createClient().from('tasks').delete().eq('id', id);
-    }
+  async function handleDelete(id: string) {
+    if (!userId) return reportExpiredSession();
+    await save.run(async () => {
+      const result = await createClient()
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select('id')
+        .single();
+      if (!result.error) storeDelete(id);
+      return result;
+    });
   }
 
-  const groups = mounted ? groupTasks(tasks) : [];
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredTasks = tasks.filter((task) => {
+    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
+    const matchesQuery = !normalizedQuery
+      || task.title.toLowerCase().includes(normalizedQuery)
+      || task.notes?.toLowerCase().includes(normalizedQuery);
+    return matchesPriority && matchesQuery;
+  });
+  const groups = mounted ? groupTasks(filteredTasks, view) : [];
   const openCount = tasks.filter((t) => t.status === 'open').length;
+  const todayCount = tasks.filter(
+    (task) => task.status === 'open' && task.dueDate && task.dueDate <= localDate()
+  ).length;
+  const upcomingCount = tasks.filter(
+    (task) => task.status === 'open' && task.dueDate && task.dueDate > localDate()
+  ).length;
+  const completedCount = tasks.filter((task) => task.status !== 'open').length;
 
   if (!mounted) return null;
 
   return (
     <div className="flex min-h-screen bg-bg-base">
+      <SaveStatus state={save.state} message={save.message} onRetry={save.retry} />
       <Sidebar />
 
       <main className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-8 py-8 pb-56 md:pb-36">
@@ -158,10 +226,46 @@ export default function TasksPage() {
           </div>
         </div>
 
+        <div className="mb-8 space-y-3">
+          <div className="flex gap-1 overflow-x-auto rounded-xl border border-line bg-bg-surface/65 p-1">
+            <ViewTab label="Open" count={openCount} active={view === 'open'} onClick={() => setView('open')} />
+            <ViewTab label="Today" count={todayCount} active={view === 'today'} onClick={() => setView('today')} />
+            <ViewTab label="Upcoming" count={upcomingCount} active={view === 'upcoming'} onClick={() => setView('upcoming')} />
+            <ViewTab label="Completed" count={completedCount} active={view === 'completed'} onClick={() => setView('completed')} />
+          </div>
+          <div className="flex gap-2">
+            <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-bg-surface px-3 focus-within:border-accent/40">
+              <SearchIcon />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search tasks"
+                className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-ink-primary placeholder:text-ink-faint focus:outline-none"
+              />
+            </label>
+            <select
+              value={priorityFilter}
+              onChange={(event) => setPriorityFilter(event.target.value as TaskPriority | 'all')}
+              aria-label="Filter by priority"
+              className="rounded-lg border border-line bg-bg-surface px-3 text-xs text-ink-secondary focus:border-accent/40 focus:outline-none"
+            >
+              <option value="all">All priorities</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        </div>
+
         {groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <p className="text-ink-faint text-sm mb-1">No tasks.</p>
-            <p className="text-ink-faint text-xs">Add one below to get started.</p>
+            <p className="text-ink-tertiary text-sm mb-1">
+              {query || priorityFilter !== 'all' ? 'No matching tasks.' : `No ${view} tasks.`}
+            </p>
+            <p className="text-ink-faint text-xs">
+              {view === 'completed' ? 'Completed tasks will appear here.' : 'Add one below when you are ready.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -194,7 +298,7 @@ export default function TasksPage() {
             />
             <button
               onClick={handleAdd}
-              disabled={!addTitle.trim()}
+              disabled={!addTitle.trim() || save.state === 'saving'}
               className="px-4 py-3 rounded-lg bg-accent text-bg-base text-sm font-medium disabled:opacity-30 hover:bg-accent-dim transition-colors shrink-0"
             >
               Add
@@ -220,6 +324,41 @@ export default function TasksPage() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function ViewTab({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex min-w-max flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors ${
+        active
+          ? 'bg-bg-inset text-ink-primary shadow-sm'
+          : 'text-ink-tertiary hover:text-ink-primary'
+      }`}
+    >
+      {label}
+      <span className={`mono-font text-[10px] ${active ? 'text-accent' : 'text-ink-faint'}`}>{count}</span>
+    </button>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="shrink-0 text-ink-faint">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M16.5 16.5L21 21" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function TaskGroup({
   group,
@@ -468,23 +607,25 @@ function TaskRow({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs uppercase tracking-wider text-ink-tertiary w-16 shrink-0">
-              Goal
-            </span>
-            <select
-              value={task.goalId ?? ''}
-              onChange={(e) => onUpdate(task.id, { goalId: e.target.value || undefined })}
-              className="flex-1 min-w-0 text-sm bg-bg-inset/60 border border-line rounded-md px-3 py-2 text-ink-primary focus:outline-none focus:border-accent/50 transition-colors"
-            >
-              <option value="">No goal</option>
-              {goalOptions.map((goal) => (
-                <option key={goal.id} value={goal.id}>
-                  {goal.title}
-                </option>
-              ))}
-            </select>
-          </div>
+          {features.goals && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs uppercase tracking-wider text-ink-tertiary w-16 shrink-0">
+                Goal
+              </span>
+              <select
+                value={task.goalId ?? ''}
+                onChange={(e) => onUpdate(task.id, { goalId: e.target.value || undefined })}
+                className="flex-1 min-w-0 text-sm bg-bg-inset/60 border border-line rounded-md px-3 py-2 text-ink-primary focus:outline-none focus:border-accent/50 transition-colors"
+              >
+                <option value="">No goal</option>
+                {goalOptions.map((goal) => (
+                  <option key={goal.id} value={goal.id}>
+                    {goal.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex items-center gap-2 pt-1">
             <button

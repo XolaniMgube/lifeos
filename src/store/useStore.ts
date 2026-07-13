@@ -93,7 +93,9 @@ type AppState = {
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   userId: string | null;
+  userEmail: string | null;
   setUserId: (id: string | null) => void;
+  setUserEmail: (email: string | null) => void;
   // Modules
   gym: GymSlice;
   tasks: TasksSlice;
@@ -117,7 +119,9 @@ export const useStore = create<AppState>()(
       theme: 'dark',
       toggleTheme: () => set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
       userId: null,
+      userEmail: null,
       setUserId: (id) => set({ userId: id }),
+      setUserEmail: (email) => set({ userEmail: email }),
 
       gym: {
         sessions: [],

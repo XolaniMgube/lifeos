@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { features } from '@/config/features';
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -35,6 +36,14 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isLoginPage) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  const isPausedModule =
+    (!features.gym && request.nextUrl.pathname.startsWith('/gym')) ||
+    (!features.goals && request.nextUrl.pathname.startsWith('/goals'));
+
+  if (user && isPausedModule) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useStore, SessionLog, Task, Goal } from '@/store/useStore';
+import { features } from '@/config/features';
 
 // ── DB row → TypeScript type converters ─────────────────────────────────────
 
@@ -58,6 +59,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const hydrateTasks = useStore((s) => s.tasks.hydrate);
   const hydrateGoals = useStore((s) => s.goals.hydrate);
   const setUserId = useStore((s) => s.setUserId);
+  const setUserEmail = useStore((s) => s.setUserEmail);
 
   useEffect(() => {
     const supabase = createClient();
@@ -69,23 +71,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       if (!user) return;
       setUserId(user.id);
+      setUserEmail(user.email ?? null);
 
       const [sessionsRes, tasksRes, goalsRes] = await Promise.all([
-        supabase
-          .from('gym_sessions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('date', { ascending: true }),
+        features.gym
+          ? supabase
+              .from('gym_sessions')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('date', { ascending: true })
+          : Promise.resolve({ data: [], error: null }),
         supabase
           .from('tasks')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: true }),
-        supabase
-          .from('goals')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: true }),
+        features.goals
+          ? supabase
+              .from('goals')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: true })
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (sessionsRes.data) hydrateGym(sessionsRes.data.map(dbToSession));
@@ -99,10 +106,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         setUserId(session.user.id);
+        setUserEmail(session.user.email ?? null);
         load();
       }
       if (event === 'SIGNED_OUT') {
         setUserId(null);
+        setUserEmail(null);
         hydrateGym([]);
         hydrateTasks([]);
         hydrateGoals([]);

@@ -9,6 +9,8 @@ import { exercises } from '@/data/exercises';
 import { useStore, ExerciseLog, SessionLog, useLastEntry } from '@/store/useStore';
 import { createClient } from '@/lib/supabase';
 import { sessionToDb } from '@/components/DataProvider';
+import { SaveStatus } from '@/components/SaveStatus';
+import { useSaveStatus } from '@/hooks/useSaveStatus';
 
 function LogPageInner() {
   const params = useSearchParams();
@@ -44,6 +46,7 @@ function LogPageInner() {
   const [feeling, setFeeling] = useState<'great' | 'good' | 'tough' | 'rough' | undefined>(
     existingSession?.feeling
   );
+  const save = useSaveStatus();
 
   useEffect(() => {
     setLogs(initialLogs);
@@ -85,24 +88,33 @@ function LogPageInner() {
     });
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (save.state === 'saving') return;
+    if (!userId) {
+      await save.run(async () => ({ error: { message: 'Your session expired. Sign in again.' } }));
+      return;
+    }
+
     const session: SessionLog = {
-      id: existingSession?.id ?? `${currentCycle}-${dayParam}-${Date.now()}`,
+      id: existingSession?.id ?? crypto.randomUUID(),
       cycleNumber: currentCycle,
       dayNumber: dayParam,
       date: existingSession?.date ?? new Date().toISOString(),
       exercises: logs,
       feeling,
     };
-    saveSession(session);
-
-    if (userId) {
-      const supabase = createClient();
-      const row = sessionToDb(session, userId);
-      supabase.from('gym_sessions').upsert(row);
-    }
-
-    router.push('/gym?saved=1');
+    await save.run(async () => {
+      const result = await createClient()
+        .from('gym_sessions')
+        .upsert(sessionToDb(session, userId))
+        .select('id')
+        .single();
+      if (!result.error) {
+        saveSession(session);
+        router.push('/gym?saved=1');
+      }
+      return result;
+    });
   }
 
   if (!mounted) return null;
@@ -111,6 +123,7 @@ function LogPageInner() {
 
   return (
     <div className="flex min-h-screen bg-bg-base">
+      <SaveStatus state={save.state} message={save.message} onRetry={save.retry} />
       <Sidebar />
 
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 pb-36 md:pb-10">
@@ -193,9 +206,10 @@ function LogPageInner() {
           </Link>
           <button
             onClick={handleSave}
-            className="min-h-11 px-5 py-2.5 rounded-md text-sm bg-accent text-bg-base font-medium hover:bg-accent-dim transition-colors"
+            disabled={save.state === 'saving'}
+            className="min-h-11 px-5 py-2.5 rounded-md text-sm bg-accent text-bg-base font-medium hover:bg-accent-dim transition-colors disabled:cursor-wait disabled:opacity-60"
           >
-            Save session
+            {save.state === 'saving' ? 'Saving…' : 'Save session'}
           </button>
         </div>
       </main>
